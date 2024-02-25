@@ -1,10 +1,11 @@
-#include "app/headers/Application.h"
+#include "Application.h"
+#include <windows.h>
 
-int main( int argc, char* argv[] ) {
+BOOL IsWindowClosed = FALSE;
 
-    Application app;
+int main(int argc, char *argv[])
+{
+	Application::getInstance().run();
 
-    app.run();
-
-    return 0;
+	return 0;
 }
