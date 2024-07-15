@@ -6,12 +6,33 @@
 #include <map>
 #include <string>
 
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.hpp>
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#define APPLICATION_VERSION VK_MAKE_VERSION(1, 0, 0)
+#define APPLICATION_NAME "App"
+
+#define ENGINE_VERSION VK_MAKE_VERSION(0, 1, 0)
+#define ENGINE_NAME "Sandbox"
+
 class Application
 {
 private:
-	Application(){};
+	Application()
+	{
+		this->preferedDeviceName = "NVIDIA GeForce RTX 4080";
+		this->physicalDevice = VK_NULL_HANDLE;
+	};
 
 	std::map<HWND, Window *> windowMap;
+	VkInstance vulkanInstance;
+
+	std::string preferedDeviceName;
+	std::string selectedDeviceName;
+	VkPhysicalDevice physicalDevice;
 
 public:
 	Application(Application const &) = delete;
@@ -23,6 +44,9 @@ public:
 		return pInstance;
 	}
 
+	static void error_callback(int error, const char *description);
+	static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
+
 	void run();
 	void stop();
 
@@ -33,4 +57,10 @@ public:
 	void addWindow(Window *);
 	void deleteWindow(std::string code);
 	void deleteWindow(HWND handle);
+
+	VkInstance *createVulkanInstance();
+	VkInstance *getVulkanInstance();
+	void checkInstanceExtensions();
+	void pickPhysicalDevice();
+	bool isDeviceSuitable(VkPhysicalDevice device);
 };
