@@ -1,5 +1,5 @@
+#include "Core.h"
 #include "Application.h"
-#include "base/Window.h"
 
 #include <iostream>
 #include <string>
@@ -17,14 +17,6 @@ void Application::key_callback(GLFWwindow *window, int key, int scancode, int ac
 
 void Application::run()
 {
-	// Window *mainWindow = new Window();
-	// mainWindow->setCode("main");
-	// mainWindow->openWindow(640, 480);
-
-	// this->addWindow(mainWindow);
-
-	// vkCreateWin32SurfaceKHR
-
 	if (!glfwInit())
 	{
 		throw std::runtime_error("Cannot initialize GLFW!");
@@ -41,19 +33,7 @@ void Application::run()
 	this->checkInstanceExtensions();
 	VkInstance *vulkanInstance = this->createVulkanInstance();
 	this->pickPhysicalDevice();
-
-	//	while (true)
-	//	{
-	//		mainWindow->event();
-	//		// for( int i = 0; i < 256; i++) {
-	//		//     if(Keyboard[i] == SB_KEYACTION_CLICK) Keyboard[i] = SB_KEYACTION_PRESS;
-	//		//     else if(Keyboard[i] == SB_KEYACTION_UP) Keyboard[i] = SB_KEYACTION_NONE;}
-	//
-	//		if (mainWindow->isWindowClosed())
-	//		{
-	//			break;
-	//		}
-	//	}
+	this->createLogicalDevice();
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -61,7 +41,8 @@ void Application::run()
 	}
 
 	// cleanup
-	vkDestroyInstance(*vulkanInstance, nullptr);
+	vkDestroyDevice(this->logicalDevice, nullptr);
+	vkDestroyInstance(this->vulkanInstance, nullptr);
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
@@ -70,72 +51,7 @@ void Application::stop()
 {
 }
 
-bool Application::isWindowExist(std::string code)
-{
-	bool found = false;
-
-	for (const auto &[key, value] : this->windowMap)
-	{
-		if (value->getCode().compare(code) == 0)
-		{
-			found = true;
-		}
-	}
-
-	return found;
-}
-
-bool Application::isWindowExist(HWND handle)
-{
-	return this->windowMap.contains(handle);
-}
-
-Window *Application::getWindow(std::string code)
-{
-	for (const auto &[key, value] : this->windowMap)
-	{
-		if (value->getCode().compare(code) == 0)
-		{
-			return value;
-		}
-	}
-
-	return NULL;
-}
-
-Window *Application::getWindow(HWND handle)
-{
-	return this->windowMap.contains(handle) ? this->windowMap[handle] : NULL;
-}
-
-void Application::addWindow(Window *window)
-{
-	if (!this->windowMap.contains(window->getWindowHandle()))
-	{
-		this->windowMap[window->getWindowHandle()] = window;
-	}
-}
-
-void Application::deleteWindow(std::string code)
-{
-	for (const auto &[key, value] : this->windowMap)
-	{
-		if (value->getCode().compare(code) == 0)
-		{
-			this->windowMap.erase(value->getWindowHandle());
-		}
-	}
-}
-
-void Application::deleteWindow(HWND handle)
-{
-	if (this->windowMap.contains(handle))
-	{
-		this->windowMap.erase(handle);
-	}
-}
-
-VkInstance *Application::createVulkanInstance()
+void Application::createVulkanInstance()
 {
 	VkApplicationInfo appInfo;
 	appInfo.pNext = nullptr;
@@ -174,8 +90,6 @@ VkInstance *Application::createVulkanInstance()
 	{
 		throw std::runtime_error(std::format("Failed to create vulkan instance! Code {}", (int)result));
 	}
-
-	return &this->vulkanInstance;
 }
 
 VkInstance *Application::getVulkanInstance()
@@ -258,6 +172,66 @@ bool Application::isDeviceSuitable(VkPhysicalDevice device)
 	VkPhysicalDeviceFeatures deviceFeatures;
 	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-	return (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) &&
+	QueueFamilyIndices indices = this->findQueueFamilies(device);
+
+	return indices.isComplete() &&
+		   (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) &&
 		   deviceFeatures.geometryShader;
+}
+
+QueueFamilyIndices Application::findQueueFamilies(VkPhysicalDevice device)
+{
+	QueueFamilyIndices indices;
+
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+	int i = 0;
+	for (const auto &queueFamily : queueFamilies)
+	{
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			indices.graphicsFamily = i;
+			break;
+		}
+
+		i++;
+	}
+
+	return indices;
+}
+
+void Application::createLogicalDevice()
+{
+	QueueFamilyIndices indices = findQueueFamilies(this->physicalDevice);
+
+	VkDeviceQueueCreateInfo queueCreateInfo;
+	queueCreateInfo.pNext = nullptr;
+	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+	queueCreateInfo.queueCount = 1;
+
+	float queuePriority = 1.0f;
+	queueCreateInfo.pQueuePriorities = &queuePriority;
+
+	VkPhysicalDeviceFeatures deviceFeatures;
+
+	VkDeviceCreateInfo createInfo;
+	createInfo.pNext = nullptr;
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pQueueCreateInfos = &queueCreateInfo;
+	createInfo.queueCreateInfoCount = 1;
+	createInfo.pEnabledFeatures = &deviceFeatures;
+	createInfo.enabledExtensionCount = 0;
+	createInfo.enabledLayerCount = 0;
+
+	if (vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice) != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create logical device!");
+	}
+
+	vkGetDeviceQueue(this->logicalDevice, indices.graphicsFamily.value(), 0, &this->graphicsQueue);
 }

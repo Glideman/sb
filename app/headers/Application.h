@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Core.h"
 #include "base/Logger.h"
-#include "base/Window.h"
 
 #include <map>
 #include <string>
@@ -27,12 +27,13 @@ private:
 		this->physicalDevice = VK_NULL_HANDLE;
 	};
 
-	std::map<HWND, Window *> windowMap;
-	VkInstance vulkanInstance;
-
 	std::string preferedDeviceName;
 	std::string selectedDeviceName;
+
+	VkInstance vulkanInstance;
 	VkPhysicalDevice physicalDevice;
+	VkDevice logicalDevice;
+	VkQueue graphicsQueue;
 
 public:
 	Application(Application const &) = delete;
@@ -50,17 +51,11 @@ public:
 	void run();
 	void stop();
 
-	bool isWindowExist(std::string code);
-	bool isWindowExist(HWND handle);
-	Window *getWindow(std::string code);
-	Window *getWindow(HWND handle);
-	void addWindow(Window *);
-	void deleteWindow(std::string code);
-	void deleteWindow(HWND handle);
-
-	VkInstance *createVulkanInstance();
+	void createVulkanInstance();
 	VkInstance *getVulkanInstance();
 	void checkInstanceExtensions();
 	void pickPhysicalDevice();
 	bool isDeviceSuitable(VkPhysicalDevice device);
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	void createLogicalDevice();
 };

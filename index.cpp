@@ -1,5 +1,5 @@
+#include "Core.h"
 #include "Application.h"
-#include <windows.h>
 
 BOOL IsWindowClosed = FALSE;
 
