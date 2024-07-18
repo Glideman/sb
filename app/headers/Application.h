@@ -1,9 +1,8 @@
 #pragma once
 
-#include "Core.h"
+#include "base/Core.h"
 #include "base/Logger.h"
 
-#include <map>
 #include <string>
 
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -30,10 +29,13 @@ private:
 	std::string preferedDeviceName;
 	std::string selectedDeviceName;
 
+	GLFWwindow *window;
 	VkInstance vulkanInstance;
 	VkPhysicalDevice physicalDevice;
 	VkDevice logicalDevice;
+	VkSurfaceKHR vulkanSurface;
 	VkQueue graphicsQueue;
+	VkQueue presentQueue;
 
 public:
 	Application(Application const &) = delete;
@@ -50,7 +52,10 @@ public:
 
 	void run();
 	void stop();
+	void init();
+	void cleanup();
 
+	void createWindow();
 	void createVulkanInstance();
 	VkInstance *getVulkanInstance();
 	void checkInstanceExtensions();
@@ -58,4 +63,5 @@ public:
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	void createLogicalDevice();
+	void createSurface();
 };

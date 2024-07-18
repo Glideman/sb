@@ -1,8 +1,10 @@
-#include "Core.h"
+#include "base/Core.h"
 #include "Application.h"
 
 #include <iostream>
 #include <string>
+#include <set>
+#include <map>
 
 void Application::error_callback(int error, const char *description)
 {
@@ -17,6 +19,41 @@ void Application::key_callback(GLFWwindow *window, int key, int scancode, int ac
 
 void Application::run()
 {
+	this->init();
+
+	while (!glfwWindowShouldClose(this->window))
+	{
+		glfwPollEvents();
+	}
+
+	this->cleanup();
+}
+
+void Application::stop()
+{
+}
+
+void Application::init()
+{
+	this->createWindow();
+	this->checkInstanceExtensions();
+	this->createVulkanInstance();
+	this->createSurface();
+	this->pickPhysicalDevice();
+	this->createLogicalDevice();
+}
+
+void Application::cleanup()
+{
+	vkDestroyDevice(this->logicalDevice, nullptr);
+	vkDestroySurfaceKHR(this->vulkanInstance, this->vulkanSurface, nullptr);
+	vkDestroyInstance(this->vulkanInstance, nullptr);
+	glfwDestroyWindow(this->window);
+	glfwTerminate();
+}
+
+void Application::createWindow()
+{
 	if (!glfwInit())
 	{
 		throw std::runtime_error("Cannot initialize GLFW!");
@@ -27,33 +64,19 @@ void Application::run()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-	GLFWwindow *window = glfwCreateWindow(800, 600, APPLICATION_NAME, nullptr, nullptr);
-	glfwSetKeyCallback(window, key_callback);
+	this->window = glfwCreateWindow(800, 600, APPLICATION_NAME, nullptr, nullptr);
 
-	this->checkInstanceExtensions();
-	VkInstance *vulkanInstance = this->createVulkanInstance();
-	this->pickPhysicalDevice();
-	this->createLogicalDevice();
-
-	while (!glfwWindowShouldClose(window))
+	if (!this->window)
 	{
-		glfwPollEvents();
+		throw std::runtime_error("Cannot create window!");
 	}
 
-	// cleanup
-	vkDestroyDevice(this->logicalDevice, nullptr);
-	vkDestroyInstance(this->vulkanInstance, nullptr);
-	glfwDestroyWindow(window);
-	glfwTerminate();
-}
-
-void Application::stop()
-{
+	glfwSetKeyCallback(this->window, key_callback);
 }
 
 void Application::createVulkanInstance()
 {
-	VkApplicationInfo appInfo;
+	VkApplicationInfo appInfo{};
 	appInfo.pNext = nullptr;
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = APPLICATION_NAME;
@@ -62,7 +85,7 @@ void Application::createVulkanInstance()
 	appInfo.engineVersion = ENGINE_VERSION;
 	appInfo.apiVersion = VK_HEADER_VERSION_COMPLETE;
 
-	VkInstanceCreateInfo createInfo;
+	VkInstanceCreateInfo createInfo{};
 	createInfo.pNext = nullptr;
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	createInfo.pApplicationInfo = &appInfo;
@@ -85,7 +108,6 @@ void Application::createVulkanInstance()
 	}
 
 	VkResult result = vkCreateInstance(&createInfo, nullptr, &this->vulkanInstance);
-
 	if (result != VK_SUCCESS)
 	{
 		throw std::runtime_error(std::format("Failed to create vulkan instance! Code {}", (int)result));
@@ -189,12 +211,25 @@ QueueFamilyIndices Application::findQueueFamilies(VkPhysicalDevice device)
 	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
+	VkBool32 presentSupport = false;
+
 	int i = 0;
 	for (const auto &queueFamily : queueFamilies)
 	{
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->vulkanSurface, &presentSupport);
+
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
 			indices.graphicsFamily = i;
+		}
+
+		if (presentSupport)
+		{
+			indices.presentFamily = i;
+		}
+
+		if (indices.isComplete())
+		{
 			break;
 		}
 
@@ -208,30 +243,49 @@ void Application::createLogicalDevice()
 {
 	QueueFamilyIndices indices = findQueueFamilies(this->physicalDevice);
 
-	VkDeviceQueueCreateInfo queueCreateInfo;
-	queueCreateInfo.pNext = nullptr;
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-	queueCreateInfo.queueCount = 1;
+	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+	std::set<uint32_t> uniqueQueueFamilies = {
+		indices.graphicsFamily.value(),
+		indices.presentFamily.value()};
 
 	float queuePriority = 1.0f;
-	queueCreateInfo.pQueuePriorities = &queuePriority;
+	for (uint32_t queueFamily : uniqueQueueFamilies)
+	{
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.pNext = nullptr;
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamily;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfos.push_back(queueCreateInfo);
+	}
 
-	VkPhysicalDeviceFeatures deviceFeatures;
+	VkPhysicalDeviceFeatures deviceFeatures{};
 
-	VkDeviceCreateInfo createInfo;
+	VkDeviceCreateInfo createInfo{};
 	createInfo.pNext = nullptr;
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pQueueCreateInfos = &queueCreateInfo;
-	createInfo.queueCreateInfoCount = 1;
+	createInfo.pQueueCreateInfos = queueCreateInfos.data();
+	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = 0;
 	createInfo.enabledLayerCount = 0;
 
-	if (vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice) != VK_SUCCESS)
+	VkResult result = vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice);
+	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to create logical device!");
+		throw std::runtime_error(std::format("Failed to create logical device! Code {}", (int)result));
 	}
 
 	vkGetDeviceQueue(this->logicalDevice, indices.graphicsFamily.value(), 0, &this->graphicsQueue);
+	vkGetDeviceQueue(this->logicalDevice, indices.presentFamily.value(), 0, &this->presentQueue);
+}
+
+void Application::createSurface()
+{
+	VkResult result = glfwCreateWindowSurface(this->vulkanInstance, this->window, nullptr, &this->vulkanSurface);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(std::format("Failed to create window surface! Code {}", (int)result));
+	}
 }
