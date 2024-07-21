@@ -1,0 +1,7 @@
+#pragma once
+
+#define APPLICATION_VERSION VK_MAKE_VERSION(1, 0, 0)
+#define APPLICATION_NAME "App"
+
+#define ENGINE_VERSION VK_MAKE_VERSION(0, 1, 0)
+#define ENGINE_NAME "Sandbox"

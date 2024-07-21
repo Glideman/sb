@@ -1,41 +1,19 @@
 #pragma once
 
-#include "base/Core.h"
 #include "base/Logger.h"
+#include "device/Device.h"
 
 #include <string>
-
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.hpp>
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define APPLICATION_VERSION VK_MAKE_VERSION(1, 0, 0)
-#define APPLICATION_NAME "App"
-
-#define ENGINE_VERSION VK_MAKE_VERSION(0, 1, 0)
-#define ENGINE_NAME "Sandbox"
 
 class Application
 {
 private:
 	Application()
 	{
-		this->preferedDeviceName = "NVIDIA GeForce RTX 4080";
-		this->physicalDevice = VK_NULL_HANDLE;
-	};
+		this->device = new Device();
+	}
 
-	std::string preferedDeviceName;
-	std::string selectedDeviceName;
-
-	GLFWwindow *window;
-	VkInstance vulkanInstance;
-	VkPhysicalDevice physicalDevice;
-	VkDevice logicalDevice;
-	VkSurfaceKHR vulkanSurface;
-	VkQueue graphicsQueue;
-	VkQueue presentQueue;
+	Device *device;
 
 public:
 	Application(Application const &) = delete;
@@ -47,21 +25,8 @@ public:
 		return pInstance;
 	}
 
-	static void error_callback(int error, const char *description);
-	static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
-
-	void run();
+	int run();
 	void stop();
 	void init();
 	void cleanup();
-
-	void createWindow();
-	void createVulkanInstance();
-	VkInstance *getVulkanInstance();
-	void checkInstanceExtensions();
-	void pickPhysicalDevice();
-	bool isDeviceSuitable(VkPhysicalDevice device);
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-	void createLogicalDevice();
-	void createSurface();
 };
