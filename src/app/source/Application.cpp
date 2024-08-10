@@ -1,0 +1,32 @@
+#include "Application.h"
+#include "core/Loader.h"
+
+int Application::run()
+{
+	this->init();
+
+	while (!glfwWindowShouldClose(this->graphicsProvider->getWindow()))
+	{
+		glfwPollEvents();
+	}
+
+	this->cleanup();
+
+	return 0;
+}
+
+void Application::stop()
+{
+}
+
+void Application::init()
+{
+	// TODO Вынести в конфиг
+	Loader::getInstance().init("data");
+	this->graphicsProvider->init();
+}
+
+void Application::cleanup()
+{
+	this->graphicsProvider->cleanup();
+}

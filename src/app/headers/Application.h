@@ -1,19 +1,22 @@
 #pragma once
 
-#include "base/Logger.h"
-#include "device/Device.h"
+#include "core/Logger.h"
+#include "graphics/GraphicsProvider.h"
 
+#include <iostream>
 #include <string>
+#include <set>
+#include <map>
 
 class Application
 {
 private:
 	Application()
 	{
-		this->device = new Device();
+		this->graphicsProvider = new GraphicsProvider();
 	}
 
-	Device *device;
+	GraphicsProvider *graphicsProvider;
 
 public:
 	Application(Application const &) = delete;

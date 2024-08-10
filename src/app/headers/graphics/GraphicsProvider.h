@@ -2,9 +2,16 @@
 
 #include "ver.h"
 
-#include <optional>
-#include <vector>
+
 #include <stdint.h>
+#include <iostream>
+#include <string>
+#include <set>
+#include <map>
+#include <optional>
+#include <limits>
+#include <algorithm>
+#include <vector>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.hpp>
@@ -27,7 +34,7 @@ typedef struct SwapChainSupportDetails
     std::vector<VkPresentModeKHR> presentModes;
 } SwapChainSupportDetails;
 
-class Device
+class GraphicsProvider
 {
 private:
     std::string preferedDeviceName;
@@ -50,8 +57,9 @@ private:
     std::vector<VkImageView> swapChainImageViews;
 
 public:
-    Device()
+    GraphicsProvider()
     {
+	    // TODO Вынести в конфиг
         this->preferedDeviceName = "NVIDIA GeForce RTX 4080";
         this->physicalDevice = VK_NULL_HANDLE;
 
@@ -77,6 +85,7 @@ public:
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     void createLogicalDevice();
+    VkDevice getLogicalDevice();
     void createSurface();
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
@@ -85,4 +94,7 @@ public:
     void createSwapChain();
     void createImageViews();
     void createGraphicsPipeline();
+    void destroyGraphicsPipeline();
+    VkShaderModule createShaderModule(const std::vector<char>& code);
+    void destroyShaderModule(const VkShaderModule& module);
 };

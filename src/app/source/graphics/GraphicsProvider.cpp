@@ -1,31 +1,22 @@
-#include "device\Device.h"
-
-#include <stdint.h>
-#include <iostream>
-#include <string>
-#include <set>
-#include <map>
-#include <optional>
-#include <limits>
-#include <algorithm>
+#include "graphics/GraphicsProvider.h"
 
 bool QueueFamilyIndices::isComplete()
 {
     return graphicsFamily.has_value() && presentFamily.has_value();
 }
 
-void Device::error_callback(int error, const char *description)
+void GraphicsProvider::error_callback(int error, const char *description)
 {
     fprintf(stderr, "Error: %s\n", description);
 }
 
-void Device::key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
+void GraphicsProvider::key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-void Device::init()
+void GraphicsProvider::init()
 {
     this->createWindow();
     this->checkInstanceExtensions();
@@ -39,7 +30,7 @@ void Device::init()
     this->createGraphicsPipeline();
 }
 
-void Device::cleanup()
+void GraphicsProvider::cleanup()
 {
     for (auto imageView : this->swapChainImageViews)
     {
@@ -54,7 +45,7 @@ void Device::cleanup()
     glfwTerminate();
 }
 
-void Device::createWindow()
+void GraphicsProvider::createWindow()
 {
     if (!glfwInit())
     {
@@ -76,12 +67,12 @@ void Device::createWindow()
     glfwSetKeyCallback(this->window, key_callback);
 }
 
-GLFWwindow *Device::getWindow()
+GLFWwindow *GraphicsProvider::getWindow()
 {
     return this->window;
 }
 
-void Device::createVulkanInstance()
+void GraphicsProvider::createVulkanInstance()
 {
     VkApplicationInfo appInfo{};
     appInfo.pNext = nullptr;
@@ -121,12 +112,12 @@ void Device::createVulkanInstance()
     }
 }
 
-VkInstance *Device::getVulkanInstance()
+VkInstance *GraphicsProvider::getVulkanInstance()
 {
     return &this->vulkanInstance;
 }
 
-void Device::checkInstanceExtensions()
+void GraphicsProvider::checkInstanceExtensions()
 {
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -142,7 +133,7 @@ void Device::checkInstanceExtensions()
     }
 }
 
-void Device::pickPhysicalDevice()
+void GraphicsProvider::pickPhysicalDevice()
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(*this->getVulkanInstance(), &deviceCount, nullptr);
@@ -193,7 +184,7 @@ void Device::pickPhysicalDevice()
     }
 }
 
-bool Device::isDeviceSuitable(VkPhysicalDevice device)
+bool GraphicsProvider::isDeviceSuitable(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices = this->findQueueFamilies(device);
 
@@ -212,7 +203,7 @@ bool Device::isDeviceSuitable(VkPhysicalDevice device)
            extensionSupported && swapChainAdequate;
 }
 
-bool Device::checkDevicePropertiesSupport(VkPhysicalDevice device)
+bool GraphicsProvider::checkDevicePropertiesSupport(VkPhysicalDevice device)
 {
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -220,7 +211,7 @@ bool Device::checkDevicePropertiesSupport(VkPhysicalDevice device)
     return (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU);
 }
 
-bool Device::checkDeviceFeaturesSupport(VkPhysicalDevice device)
+bool GraphicsProvider::checkDeviceFeaturesSupport(VkPhysicalDevice device)
 {
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
@@ -228,7 +219,7 @@ bool Device::checkDeviceFeaturesSupport(VkPhysicalDevice device)
     return deviceFeatures.geometryShader;
 }
 
-bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device)
+bool GraphicsProvider::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -246,7 +237,7 @@ bool Device::checkDeviceExtensionSupport(VkPhysicalDevice device)
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device)
+QueueFamilyIndices GraphicsProvider::findQueueFamilies(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices;
 
@@ -286,7 +277,7 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device)
     return indices;
 }
 
-void Device::createLogicalDevice()
+void GraphicsProvider::createLogicalDevice()
 {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -327,7 +318,12 @@ void Device::createLogicalDevice()
     vkGetDeviceQueue(this->logicalDevice, this->queueFamilyndices.presentFamily.value(), 0, &this->presentQueue);
 }
 
-void Device::createSurface()
+VkDevice GraphicsProvider::getLogicalDevice()
+{
+    return this->logicalDevice;
+}
+
+void GraphicsProvider::createSurface()
 {
     VkResult result = glfwCreateWindowSurface(this->vulkanInstance, this->window, nullptr, &this->vulkanSurface);
     if (result != VK_SUCCESS)
@@ -336,7 +332,7 @@ void Device::createSurface()
     }
 }
 
-SwapChainSupportDetails Device::querySwapChainSupport(VkPhysicalDevice device)
+SwapChainSupportDetails GraphicsProvider::querySwapChainSupport(VkPhysicalDevice device)
 {
     SwapChainSupportDetails details{};
 
@@ -363,7 +359,7 @@ SwapChainSupportDetails Device::querySwapChainSupport(VkPhysicalDevice device)
     return details;
 }
 
-VkSurfaceFormatKHR Device::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats)
+VkSurfaceFormatKHR GraphicsProvider::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats)
 {
     for (const auto &availableFormat : availableFormats)
     {
@@ -376,7 +372,7 @@ VkSurfaceFormatKHR Device::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFo
     return availableFormats[0];
 }
 
-VkPresentModeKHR Device::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes)
+VkPresentModeKHR GraphicsProvider::chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes)
 {
     for (const auto &availablePresentMode : availablePresentModes)
     {
@@ -389,7 +385,7 @@ VkPresentModeKHR Device::chooseSwapPresentMode(const std::vector<VkPresentModeKH
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D Device::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
+VkExtent2D GraphicsProvider::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
 {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -404,7 +400,7 @@ VkExtent2D Device::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities
     return actualExtent;
 }
 
-void Device::createSwapChain()
+void GraphicsProvider::createSwapChain()
 {
     VkSurfaceFormatKHR surfaceFormat = this->chooseSwapSurfaceFormat(this->swapChainSupportDetails.formats);
     VkPresentModeKHR presentMode = this->chooseSwapPresentMode(this->swapChainSupportDetails.presentModes);
@@ -462,7 +458,7 @@ void Device::createSwapChain()
     this->swapChainExtent = extent;
 }
 
-void Device::createImageViews()
+void GraphicsProvider::createImageViews()
 {
     this->swapChainImageViews.resize(this->swapChainImages.size());
 
@@ -493,6 +489,32 @@ void Device::createImageViews()
     }
 }
 
-void Device::createGraphicsPipeline()
+void GraphicsProvider::createGraphicsPipeline()
 {
+}
+
+void GraphicsProvider::destroyGraphicsPipeline()
+{
+}
+
+VkShaderModule GraphicsProvider::createShaderModule(const std::vector<char> &code)
+{
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.pNext = nullptr;
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(this->logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create shader module!");
+    }
+
+    return shaderModule;
+}
+
+void GraphicsProvider::destroyShaderModule(const VkShaderModule &module)
+{
+    vkDestroyShaderModule(this->logicalDevice, module, nullptr);
 }
