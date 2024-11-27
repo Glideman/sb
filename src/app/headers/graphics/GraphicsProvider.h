@@ -19,6 +19,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "core/Loader.h"
+
 typedef struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
@@ -55,6 +57,7 @@ private:
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
+    std::vector<VkShaderModule> shaders;
 
 public:
     GraphicsProvider()
@@ -95,6 +98,7 @@ public:
     void createImageViews();
     void createGraphicsPipeline();
     void destroyGraphicsPipeline();
+    VkShaderModule loadShader(const std::string &fileName);
     VkShaderModule createShaderModule(const std::vector<char>& code);
     void destroyShaderModule(const VkShaderModule& module);
 };

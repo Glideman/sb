@@ -32,6 +32,8 @@ void GraphicsProvider::init()
 
 void GraphicsProvider::cleanup()
 {
+    this->destroyGraphicsPipeline();
+    
     for (auto imageView : this->swapChainImageViews)
     {
         vkDestroyImageView(this->logicalDevice, imageView, nullptr);
@@ -491,10 +493,53 @@ void GraphicsProvider::createImageViews()
 
 void GraphicsProvider::createGraphicsPipeline()
 {
+    VkShaderModule vertShader = this->loadShader("shaders\\basicTriangle.vert.spv");
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.pNext = nullptr;
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShader;
+    vertShaderStageInfo.pName = "main";
+
+    VkShaderModule fragShader = this->loadShader("shaders\\basicTriangle.frag.spv");
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.pNext = nullptr;
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fragShader;
+    fragShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    // Some pipeline stuff
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.pNext = nullptr;
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
 }
 
 void GraphicsProvider::destroyGraphicsPipeline()
 {
+    for (int i = this->shaders.size()-1; i >= 0 ; i--)
+    {
+        this->destroyShaderModule(this->shaders[i]);
+    }
+}
+
+VkShaderModule GraphicsProvider::loadShader(const std::string &fileName)
+{
+    auto shaderCode = Loader::getInstance().readFile(fileName);
+    VkShaderModule module = this->createShaderModule(shaderCode);
+
+    this->shaders.push_back(module);
+
+    return module;
 }
 
 VkShaderModule GraphicsProvider::createShaderModule(const std::vector<char> &code)
@@ -514,7 +559,7 @@ VkShaderModule GraphicsProvider::createShaderModule(const std::vector<char> &cod
     return shaderModule;
 }
 
-void GraphicsProvider::destroyShaderModule(const VkShaderModule &module)
+void GraphicsProvider::destroyShaderModule(const VkShaderModule& module)
 {
     vkDestroyShaderModule(this->logicalDevice, module, nullptr);
 }
