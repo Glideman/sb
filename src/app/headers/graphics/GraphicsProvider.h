@@ -58,6 +58,7 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkShaderModule> shaders;
+    VkPipelineLayout pipelineLayout;
 
 public:
     GraphicsProvider()
