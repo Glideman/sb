@@ -26,13 +26,14 @@ void GraphicsProvider::init()
     this->createLogicalDevice();
     this->createSwapChain();
     this->createImageViews();
-
+    this->createRenderPass();
     this->createGraphicsPipeline();
 }
 
 void GraphicsProvider::cleanup()
 {
     this->destroyGraphicsPipeline();
+    this->destroyRenderPass();
 
     for (auto imageView : this->swapChainImageViews)
     {
@@ -633,10 +634,35 @@ void GraphicsProvider::createGraphicsPipeline()
     {
         throw std::runtime_error("Failed to create pipeline layout!");
     }
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.pNext = nullptr;
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = nullptr; // &depthStencil
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = this->pipelineLayout;
+    pipelineInfo.renderPass = this->renderPass;
+    pipelineInfo.subpass = 0;
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    if (vkCreateGraphicsPipelines(this->logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &this->graphicsPipeline) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create graphics pipeline!");
+    }
 }
 
 void GraphicsProvider::destroyGraphicsPipeline()
 {
+    vkDestroyPipeline(this->logicalDevice, this->graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(this->logicalDevice, this->pipelineLayout, nullptr);
 
     for (int i = this->shaders.size() - 1; i >= 0; i--)
@@ -675,4 +701,44 @@ VkShaderModule GraphicsProvider::createShaderModule(const std::vector<char> &cod
 void GraphicsProvider::destroyShaderModule(const VkShaderModule &module)
 {
     vkDestroyShaderModule(this->logicalDevice, module, nullptr);
+}
+
+void GraphicsProvider::createRenderPass()
+{
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = swapChainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.pNext = nullptr;
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+
+    if (vkCreateRenderPass(this->logicalDevice, &renderPassInfo, nullptr, &this->renderPass) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create render pass!");
+    }
+}
+
+void GraphicsProvider::destroyRenderPass()
+{
+    vkDestroyRenderPass(this->logicalDevice, this->renderPass, nullptr);
 }

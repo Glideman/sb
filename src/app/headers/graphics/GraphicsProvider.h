@@ -58,7 +58,9 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkShaderModule> shaders;
+    VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
 
 public:
     GraphicsProvider()
@@ -102,4 +104,7 @@ public:
     VkShaderModule loadShader(const std::string &fileName);
     VkShaderModule createShaderModule(const std::vector<char>& code);
     void destroyShaderModule(const VkShaderModule& module);
+    void createRenderPass();
+    void destroyRenderPass();
+
 };
