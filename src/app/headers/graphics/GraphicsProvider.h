@@ -48,7 +48,7 @@ private:
     VkPhysicalDevice physicalDevice;
     VkDevice logicalDevice;
     VkSurfaceKHR vulkanSurface;
-    QueueFamilyIndices queueFamilyndices;
+    QueueFamilyIndices queueFamilyIndices;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
     SwapChainSupportDetails swapChainSupportDetails;
@@ -57,10 +57,13 @@ private:
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
+    std::vector<VkFramebuffer> swapChainFrameBuffers;
     std::vector<VkShaderModule> shaders;
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
+    VkCommandPool commandPool;
+    VkCommandBuffer commandBuffer;
 
 public:
     GraphicsProvider()
@@ -106,5 +109,8 @@ public:
     void destroyShaderModule(const VkShaderModule& module);
     void createRenderPass();
     void destroyRenderPass();
-
+    void createFrameBuffers();
+    void destroyFrameBuffers();
+    void createCommandBuffer();
+    void destroyCommandBuffer();
 };

@@ -28,10 +28,14 @@ void GraphicsProvider::init()
     this->createImageViews();
     this->createRenderPass();
     this->createGraphicsPipeline();
+    this->createFrameBuffers();
+    this->createCommandBuffer();
 }
 
 void GraphicsProvider::cleanup()
 {
+    this->destroyCommandBuffer();
+    this->destroyFrameBuffers();
     this->destroyGraphicsPipeline();
     this->destroyRenderPass();
 
@@ -275,7 +279,7 @@ QueueFamilyIndices GraphicsProvider::findQueueFamilies(VkPhysicalDevice device)
         i++;
     }
 
-    this->queueFamilyndices = indices;
+    this->queueFamilyIndices = indices;
 
     return indices;
 }
@@ -284,8 +288,8 @@ void GraphicsProvider::createLogicalDevice()
 {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
-        this->queueFamilyndices.graphicsFamily.value(),
-        this->queueFamilyndices.presentFamily.value()};
+        this->queueFamilyIndices.graphicsFamily.value(),
+        this->queueFamilyIndices.presentFamily.value()};
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -317,8 +321,8 @@ void GraphicsProvider::createLogicalDevice()
         throw std::runtime_error(std::format("Failed to create logical device! Code {}", (int)result));
     }
 
-    vkGetDeviceQueue(this->logicalDevice, this->queueFamilyndices.graphicsFamily.value(), 0, &this->graphicsQueue);
-    vkGetDeviceQueue(this->logicalDevice, this->queueFamilyndices.presentFamily.value(), 0, &this->presentQueue);
+    vkGetDeviceQueue(this->logicalDevice, this->queueFamilyIndices.graphicsFamily.value(), 0, &this->graphicsQueue);
+    vkGetDeviceQueue(this->logicalDevice, this->queueFamilyIndices.presentFamily.value(), 0, &this->presentQueue);
 }
 
 VkDevice GraphicsProvider::getLogicalDevice()
@@ -427,9 +431,9 @@ void GraphicsProvider::createSwapChain()
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    uint32_t queueFamilyIndices[] = {this->queueFamilyndices.graphicsFamily.value(), this->queueFamilyndices.presentFamily.value()};
+    uint32_t queueFamilyIndices[] = {this->queueFamilyIndices.graphicsFamily.value(), this->queueFamilyIndices.presentFamily.value()};
 
-    if (this->queueFamilyndices.graphicsFamily != this->queueFamilyndices.presentFamily)
+    if (this->queueFamilyIndices.graphicsFamily != this->queueFamilyIndices.presentFamily)
     {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
@@ -741,4 +745,72 @@ void GraphicsProvider::createRenderPass()
 void GraphicsProvider::destroyRenderPass()
 {
     vkDestroyRenderPass(this->logicalDevice, this->renderPass, nullptr);
+}
+
+void GraphicsProvider::createFrameBuffers()
+{
+    this->swapChainFrameBuffers.resize(this->swapChainImageViews.size());
+
+    for (size_t i = 0; i < this->swapChainImageViews.size(); i++)
+    {
+        VkImageView attachments[] = {
+            this->swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo frameBufferInfo{};
+        frameBufferInfo.pNext = nullptr;
+        frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        frameBufferInfo.renderPass = this->renderPass;
+        frameBufferInfo.attachmentCount = 1;
+        frameBufferInfo.pAttachments = attachments;
+        frameBufferInfo.width = this->swapChainExtent.width;
+        frameBufferInfo.height = this->swapChainExtent.height;
+        frameBufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(this->logicalDevice, &frameBufferInfo, nullptr, &this->swapChainFrameBuffers[i]) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create frame buffer!");
+        }
+    }
+}
+
+void GraphicsProvider::destroyFrameBuffers()
+{
+    for (auto frameBuffer : this->swapChainFrameBuffers)
+    {
+        vkDestroyFramebuffer(this->logicalDevice, frameBuffer, nullptr);
+    }
+}
+
+void GraphicsProvider::createCommandBuffer()
+{
+    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(this->physicalDevice);
+
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.pNext = nullptr;
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+    if (vkCreateCommandPool(this->logicalDevice, &poolInfo, nullptr, &this->commandPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create command pool!");
+    }
+
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = this->commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(this->logicalDevice, &allocInfo, &this->commandBuffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate command buffers!");
+    }
+}
+
+void GraphicsProvider::destroyCommandBuffer()
+{
+    vkFreeCommandBuffers(this->logicalDevice, this->commandPool, 1, &this->commandBuffer);
+    vkDestroyCommandPool(this->logicalDevice, this->commandPool, nullptr);
 }
