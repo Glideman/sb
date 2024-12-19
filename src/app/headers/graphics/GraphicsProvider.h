@@ -2,7 +2,6 @@
 
 #include "ver.h"
 
-
 #include <stdint.h>
 #include <iostream>
 #include <string>
@@ -65,10 +64,14 @@ private:
     VkCommandPool commandPool;
     VkCommandBuffer commandBuffer;
 
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderFinishedSemaphore;
+    VkFence inFlightFence;
+
 public:
     GraphicsProvider()
     {
-	    // TODO Вынести в конфиг
+        // TODO move to config file
         this->preferedDeviceName = "NVIDIA GeForce RTX 4080";
         this->physicalDevice = VK_NULL_HANDLE;
 
@@ -81,6 +84,7 @@ public:
 
     void init();
     void cleanup();
+    void drawFrame();
 
     void createWindow();
     GLFWwindow *getWindow();
@@ -105,12 +109,15 @@ public:
     void createGraphicsPipeline();
     void destroyGraphicsPipeline();
     VkShaderModule loadShader(const std::string &fileName);
-    VkShaderModule createShaderModule(const std::vector<char>& code);
-    void destroyShaderModule(const VkShaderModule& module);
+    VkShaderModule createShaderModule(const std::vector<char> &code);
+    void destroyShaderModule(const VkShaderModule &module);
     void createRenderPass();
     void destroyRenderPass();
     void createFrameBuffers();
     void destroyFrameBuffers();
     void createCommandBuffer();
     void destroyCommandBuffer();
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void createSyncObjects();
+    void destroySyncObjects();
 };

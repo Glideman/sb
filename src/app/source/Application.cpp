@@ -8,6 +8,7 @@ int Application::run()
 	while (!glfwWindowShouldClose(this->graphicsProvider->getWindow()))
 	{
 		glfwPollEvents();
+		this->graphicsProvider->drawFrame();
 	}
 
 	this->cleanup();
