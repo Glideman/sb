@@ -19,6 +19,7 @@
 #include <GLFW/glfw3.h>
 
 #include "core/Loader.h"
+#include "core/Logger.h"
 
 typedef struct QueueFamilyIndices
 {
@@ -68,6 +69,8 @@ private:
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
 
+    bool frameBufferResized;
+
 public:
     GraphicsProvider()
     {
@@ -77,47 +80,74 @@ public:
 
         this->deviceExtensions = {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+        this->frameBufferResized = false;
     };
 
     static void error_callback(int error, const char *description);
     static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
+    static void framebuffer_resize_callback(GLFWwindow *window, int width, int height);
 
     void init();
     void cleanup();
-    void drawFrame();
+    void waitUntilDeviceIdle();
 
     void createWindow();
     GLFWwindow *getWindow();
+    void destroyWindow();
+
     void createVulkanInstance();
     VkInstance *getVulkanInstance();
     void checkInstanceExtensions();
+    void destroyVulkanInstance();
+
     void pickPhysicalDevice();
     bool isDeviceSuitable(VkPhysicalDevice device);
     bool checkDevicePropertiesSupport(VkPhysicalDevice device);
     bool checkDeviceFeaturesSupport(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+
     void createLogicalDevice();
     VkDevice getLogicalDevice();
+    void destroyLogicalDevice();
+
     void createSurface();
+    void destroySurface();
+
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     void createSwapChain();
+    void destroySwapChain();
+
     void createImageViews();
+    void destroyImageViews();
+
+    void createFrameBuffers();
+    void destroyFrameBuffers();
+
+    void createSwapChainNecessities();
+    void updateSwapChainNecessities();
+    void destroySwapChainNecessities();
+
     void createGraphicsPipeline();
     void destroyGraphicsPipeline();
+
     VkShaderModule loadShader(const std::string &fileName);
     VkShaderModule createShaderModule(const std::vector<char> &code);
     void destroyShaderModule(const VkShaderModule &module);
+
     void createRenderPass();
     void destroyRenderPass();
-    void createFrameBuffers();
-    void destroyFrameBuffers();
+
     void createCommandBuffer();
-    void destroyCommandBuffer();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void destroyCommandBuffer();
+
     void createSyncObjects();
     void destroySyncObjects();
+
+    void drawFrame();
 };

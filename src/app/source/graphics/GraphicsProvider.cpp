@@ -16,6 +16,12 @@ void GraphicsProvider::key_callback(GLFWwindow *window, int key, int scancode, i
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
+void GraphicsProvider::framebuffer_resize_callback(GLFWwindow *window, int width, int height)
+{
+    auto provider = reinterpret_cast<GraphicsProvider *>(glfwGetWindowUserPointer(window));
+    provider->frameBufferResized = true;
+}
+
 void GraphicsProvider::init()
 {
     this->createWindow();
@@ -24,36 +30,31 @@ void GraphicsProvider::init()
     this->createSurface();
     this->pickPhysicalDevice();
     this->createLogicalDevice();
-    this->createSwapChain();
-    this->createImageViews();
+    this->createSwapChainNecessities();
     this->createRenderPass();
     this->createGraphicsPipeline();
-    this->createFrameBuffers();
     this->createCommandBuffer();
     this->createSyncObjects();
 }
 
 void GraphicsProvider::cleanup()
 {
-    vkDeviceWaitIdle(this->logicalDevice);
+    this->waitUntilDeviceIdle();
 
     this->destroySyncObjects();
     this->destroyCommandBuffer();
-    this->destroyFrameBuffers();
     this->destroyGraphicsPipeline();
     this->destroyRenderPass();
+    this->destroySwapChainNecessities();
+    this->destroyLogicalDevice();
+    this->destroySurface();
+    this->destroyVulkanInstance();
+    this->destroyWindow();
+}
 
-    for (auto imageView : this->swapChainImageViews)
-    {
-        vkDestroyImageView(this->logicalDevice, imageView, nullptr);
-    }
-
-    vkDestroySwapchainKHR(this->logicalDevice, this->swapChain, nullptr);
-    vkDestroyDevice(this->logicalDevice, nullptr);
-    vkDestroySurfaceKHR(this->vulkanInstance, this->vulkanSurface, nullptr);
-    vkDestroyInstance(this->vulkanInstance, nullptr);
-    glfwDestroyWindow(this->window);
-    glfwTerminate();
+void GraphicsProvider::waitUntilDeviceIdle()
+{
+    vkDeviceWaitIdle(this->logicalDevice);
 }
 
 void GraphicsProvider::createWindow()
@@ -66,8 +67,9 @@ void GraphicsProvider::createWindow()
     glfwSetErrorCallback(error_callback);
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
+    // TODO move to config file
     this->window = glfwCreateWindow(800, 600, APPLICATION_NAME, nullptr, nullptr);
 
     if (!this->window)
@@ -75,12 +77,21 @@ void GraphicsProvider::createWindow()
         throw std::runtime_error("Cannot create window!");
     }
 
+    glfwSetWindowUserPointer(this->window, this);
+
+    glfwSetFramebufferSizeCallback(this->window, framebuffer_resize_callback);
     glfwSetKeyCallback(this->window, key_callback);
 }
 
 GLFWwindow *GraphicsProvider::getWindow()
 {
     return this->window;
+}
+
+void GraphicsProvider::destroyWindow()
+{
+    glfwDestroyWindow(this->window);
+    glfwTerminate();
 }
 
 void GraphicsProvider::createVulkanInstance()
@@ -142,6 +153,11 @@ void GraphicsProvider::checkInstanceExtensions()
     {
         std::cout << '\t' << extension.extensionName << '\n';
     }
+}
+
+void GraphicsProvider::destroyVulkanInstance()
+{
+    vkDestroyInstance(this->vulkanInstance, nullptr);
 }
 
 void GraphicsProvider::pickPhysicalDevice()
@@ -334,6 +350,11 @@ VkDevice GraphicsProvider::getLogicalDevice()
     return this->logicalDevice;
 }
 
+void GraphicsProvider::destroyLogicalDevice()
+{
+    vkDestroyDevice(this->logicalDevice, nullptr);
+}
+
 void GraphicsProvider::createSurface()
 {
     VkResult result = glfwCreateWindowSurface(this->vulkanInstance, this->window, nullptr, &this->vulkanSurface);
@@ -341,6 +362,11 @@ void GraphicsProvider::createSurface()
     {
         throw std::runtime_error(std::format("Failed to create window surface! Code {}", (int)result));
     }
+}
+
+void GraphicsProvider::destroySurface()
+{
+    vkDestroySurfaceKHR(this->vulkanInstance, this->vulkanSurface, nullptr);
 }
 
 SwapChainSupportDetails GraphicsProvider::querySwapChainSupport(VkPhysicalDevice device)
@@ -471,6 +497,11 @@ void GraphicsProvider::createSwapChain()
     this->swapChainExtent = extent;
 }
 
+void GraphicsProvider::destroySwapChain()
+{
+    vkDestroySwapchainKHR(this->logicalDevice, this->swapChain, nullptr);
+}
+
 void GraphicsProvider::createImageViews()
 {
     this->swapChainImageViews.resize(this->swapChainImages.size());
@@ -500,6 +531,77 @@ void GraphicsProvider::createImageViews()
             throw std::runtime_error("Failed to create image views!");
         }
     }
+}
+
+void GraphicsProvider::destroyImageViews()
+{
+    for (int i = this->swapChainImageViews.size() - 1; i >= 0; i--)
+    {
+        vkDestroyImageView(this->logicalDevice, this->swapChainImageViews[i], nullptr);
+    }
+}
+
+void GraphicsProvider::createFrameBuffers()
+{
+    this->swapChainFrameBuffers.resize(this->swapChainImageViews.size());
+
+    for (size_t i = 0; i < this->swapChainImageViews.size(); i++)
+    {
+        VkImageView attachments[] = {
+            this->swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo frameBufferInfo{};
+        frameBufferInfo.pNext = nullptr;
+        frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        frameBufferInfo.renderPass = this->renderPass;
+        frameBufferInfo.attachmentCount = 1;
+        frameBufferInfo.pAttachments = attachments;
+        frameBufferInfo.width = this->swapChainExtent.width;
+        frameBufferInfo.height = this->swapChainExtent.height;
+        frameBufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(this->logicalDevice, &frameBufferInfo, nullptr, &this->swapChainFrameBuffers[i]) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create frame buffer!");
+        }
+    }
+}
+
+void GraphicsProvider::destroyFrameBuffers()
+{
+    for (int i = this->swapChainFrameBuffers.size() - 1; i >= 0; i--)
+    {
+        vkDestroyFramebuffer(this->logicalDevice, this->swapChainFrameBuffers[i], nullptr);
+    }
+}
+
+void GraphicsProvider::createSwapChainNecessities()
+{
+    this->createSwapChain();
+    this->createImageViews();
+    this->createFrameBuffers();
+}
+
+void GraphicsProvider::updateSwapChainNecessities()
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+
+    if (width == 0 || height == 0)
+    {
+        return;
+    }
+
+    this->waitUntilDeviceIdle();
+    this->destroySwapChainNecessities();
+    this->createSwapChainNecessities();
+}
+
+void GraphicsProvider::destroySwapChainNecessities()
+{
+    this->destroyFrameBuffers();
+    this->destroyImageViews();
+    this->destroySwapChain();
 }
 
 void GraphicsProvider::createGraphicsPipeline()
@@ -542,17 +644,17 @@ void GraphicsProvider::createGraphicsPipeline()
 
     // Some viewport stuff
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)this->swapChainExtent.width;
-    viewport.height = (float)this->swapChainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = this->swapChainExtent;
+    //    VkViewport viewport{};
+    //    viewport.x = 0.0f;
+    //    viewport.y = 0.0f;
+    //    viewport.width = (float)this->swapChainExtent.width;
+    //    viewport.height = (float)this->swapChainExtent.height;
+    //    viewport.minDepth = 0.0f;
+    //    viewport.maxDepth = 1.0f;
+    //
+    //    VkRect2D scissor{};
+    //    scissor.offset = {0, 0};
+    //    scissor.extent = this->swapChainExtent;
 
     // Some other pipeline stuff
 
@@ -763,40 +865,6 @@ void GraphicsProvider::destroyRenderPass()
     vkDestroyRenderPass(this->logicalDevice, this->renderPass, nullptr);
 }
 
-void GraphicsProvider::createFrameBuffers()
-{
-    this->swapChainFrameBuffers.resize(this->swapChainImageViews.size());
-
-    for (size_t i = 0; i < this->swapChainImageViews.size(); i++)
-    {
-        VkImageView attachments[] = {
-            this->swapChainImageViews[i]};
-
-        VkFramebufferCreateInfo frameBufferInfo{};
-        frameBufferInfo.pNext = nullptr;
-        frameBufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        frameBufferInfo.renderPass = this->renderPass;
-        frameBufferInfo.attachmentCount = 1;
-        frameBufferInfo.pAttachments = attachments;
-        frameBufferInfo.width = this->swapChainExtent.width;
-        frameBufferInfo.height = this->swapChainExtent.height;
-        frameBufferInfo.layers = 1;
-
-        if (vkCreateFramebuffer(this->logicalDevice, &frameBufferInfo, nullptr, &this->swapChainFrameBuffers[i]) != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to create frame buffer!");
-        }
-    }
-}
-
-void GraphicsProvider::destroyFrameBuffers()
-{
-    for (auto frameBuffer : this->swapChainFrameBuffers)
-    {
-        vkDestroyFramebuffer(this->logicalDevice, frameBuffer, nullptr);
-    }
-}
-
 void GraphicsProvider::createCommandBuffer()
 {
     QueueFamilyIndices queueFamilyIndices = findQueueFamilies(this->physicalDevice);
@@ -823,12 +891,6 @@ void GraphicsProvider::createCommandBuffer()
     {
         throw std::runtime_error("Failed to allocate command buffers!");
     }
-}
-
-void GraphicsProvider::destroyCommandBuffer()
-{
-    vkFreeCommandBuffers(this->logicalDevice, this->commandPool, 1, &this->commandBuffer);
-    vkDestroyCommandPool(this->logicalDevice, this->commandPool, nullptr);
 }
 
 void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -884,6 +946,12 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
     }
 }
 
+void GraphicsProvider::destroyCommandBuffer()
+{
+    vkFreeCommandBuffers(this->logicalDevice, this->commandPool, 1, &this->commandBuffer);
+    vkDestroyCommandPool(this->logicalDevice, this->commandPool, nullptr);
+}
+
 // TODO make a semaphore and fence arrays for easier creation and cleanup
 void GraphicsProvider::createSyncObjects()
 {
@@ -915,10 +983,23 @@ void GraphicsProvider::destroySyncObjects()
 void GraphicsProvider::drawFrame()
 {
     vkWaitForFences(this->logicalDevice, 1, &this->inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(this->logicalDevice, 1, &this->inFlightFence);
 
     uint32_t imageIndex = 0;
-    vkAcquireNextImageKHR(this->logicalDevice, this->swapChain, UINT64_MAX, this->imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    VkResult result = vkAcquireNextImageKHR(this->logicalDevice, this->swapChain, UINT64_MAX, this->imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || this->frameBufferResized)
+    {
+        this->frameBufferResized = false;
+        this->updateSwapChainNecessities();
+        return;
+    }
+
+    if (result != VK_SUCCESS)
+    {
+        return;
+    }
+
+    vkResetFences(this->logicalDevice, 1, &this->inFlightFence);
 
     vkResetCommandBuffer(this->commandBuffer, 0);
     this->recordCommandBuffer(this->commandBuffer, imageIndex);
