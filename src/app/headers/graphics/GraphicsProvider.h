@@ -20,6 +20,7 @@
 
 #include "core/Loader.h"
 #include "core/Logger.h"
+#include "core/Math.h"
 
 typedef struct QueueFamilyIndices
 {
