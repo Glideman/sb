@@ -1,4 +1,10 @@
 #include "graphics/GraphicsProvider.h"
+#include "core/Loader.h"
+#include "core/Logger.h"
+#include "core/Math.h"
+#include "graphics/Shader.h"
+#include "graphics/Vertex.h"
+#include "graphics/Mesh.h"
 
 bool QueueFamilyIndices::isComplete()
 {
@@ -35,11 +41,17 @@ void GraphicsProvider::init()
     this->createGraphicsPipeline();
     this->createCommandBuffer();
     this->createSyncObjects();
+
+    this->testoMesh = new Mesh();
+    this->testoMesh->create(this);
 }
 
 void GraphicsProvider::cleanup()
 {
     this->waitUntilDeviceIdle();
+
+    this->testoMesh->destroy();
+    delete this->testoMesh;
 
     this->destroySyncObjects();
     this->destroyCommandBuffer();
@@ -209,6 +221,11 @@ void GraphicsProvider::pickPhysicalDevice()
     {
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
+}
+
+VkPhysicalDevice GraphicsProvider::getPhysicalDevice()
+{
+    return this->physicalDevice;
 }
 
 bool GraphicsProvider::isDeviceSuitable(VkPhysicalDevice device)
@@ -606,27 +623,32 @@ void GraphicsProvider::destroySwapChainNecessities()
 
 void GraphicsProvider::createGraphicsPipeline()
 {
-    VkShaderModule vertShader = this->loadShader("shaders\\basicTriangle.vert.spv");
+    this->vertexShader = new Shader();
+    this->vertexShader->load(this, "shaders\\basicTriangle.vert.spv");
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.pNext = nullptr;
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShader;
+    vertShaderStageInfo.module = this->vertexShader->getShaderModule();
     vertShaderStageInfo.pName = "main";
 
-    VkShaderModule fragShader = this->loadShader("shaders\\basicTriangle.frag.spv");
+    this->fragmentShader = new Shader();
+    this->fragmentShader->load(this, "shaders\\basicTriangle.frag.spv");
 
     VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.pNext = nullptr;
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragShader;
+    fragShaderStageInfo.module = this->fragmentShader->getShaderModule();
     fragShaderStageInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
     // Some pipeline stuff
+
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.pNext = nullptr;
@@ -635,6 +657,10 @@ void GraphicsProvider::createGraphicsPipeline()
     vertexInputInfo.pVertexBindingDescriptions = nullptr;
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
     vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.pNext = nullptr;
@@ -777,42 +803,11 @@ void GraphicsProvider::destroyGraphicsPipeline()
     vkDestroyPipeline(this->logicalDevice, this->graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(this->logicalDevice, this->pipelineLayout, nullptr);
 
-    for (int i = this->shaders.size() - 1; i >= 0; i--)
-    {
-        this->destroyShaderModule(this->shaders[i]);
-    }
-}
+    this->fragmentShader->destroy();
+    this->vertexShader->destroy();
 
-VkShaderModule GraphicsProvider::loadShader(const std::string &fileName)
-{
-    auto shaderCode = Loader::getInstance().readFile(fileName);
-    VkShaderModule module = this->createShaderModule(shaderCode);
-
-    this->shaders.push_back(module);
-
-    return module;
-}
-
-VkShaderModule GraphicsProvider::createShaderModule(const std::vector<char> &code)
-{
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.pNext = nullptr;
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
-
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(this->logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-    {
-        throw std::runtime_error("Failed to create shader module!");
-    }
-
-    return shaderModule;
-}
-
-void GraphicsProvider::destroyShaderModule(const VkShaderModule &module)
-{
-    vkDestroyShaderModule(this->logicalDevice, module, nullptr);
+    delete this->fragmentShader;
+    delete this->vertexShader;
 }
 
 void GraphicsProvider::createRenderPass()
@@ -936,6 +931,10 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
     scissor.extent = this->swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+    VkBuffer vertexBuffers[] = {this->testoMesh->getVertexBuffer()};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
@@ -1038,4 +1037,20 @@ void GraphicsProvider::drawFrame()
     presentInfo.pResults = nullptr;
 
     vkQueuePresentKHR(this->presentQueue, &presentInfo);
+}
+
+uint32_t GraphicsProvider::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(this->physicalDevice, &memoryProperties);
+
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("Failed to find suitable memory type!");
 }

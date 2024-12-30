@@ -1,6 +1,9 @@
 #pragma once
 
+#include "core/Core.h"
+
 #include "core/Logger.h"
+#include "core/Loader.h"
 #include "graphics/GraphicsProvider.h"
 
 #include <iostream>
@@ -16,7 +19,7 @@ private:
 		this->graphicsProvider = new GraphicsProvider();
 	}
 
-	GraphicsProvider *graphicsProvider;
+	GraphicsProviderPtr graphicsProvider;
 
 public:
 	Application(Application const &) = delete;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ver.h"
+#include "core/Core.h"
 
 #include <stdint.h>
 #include <iostream>
@@ -12,15 +13,10 @@
 #include <algorithm>
 #include <vector>
 
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.hpp>
+#include "core/Vulkan.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-#include "core/Loader.h"
-#include "core/Logger.h"
-#include "core/Math.h"
 
 typedef struct QueueFamilyIndices
 {
@@ -59,7 +55,6 @@ private:
     VkExtent2D swapChainExtent;
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkFramebuffer> swapChainFrameBuffers;
-    std::vector<VkShaderModule> shaders;
     VkRenderPass renderPass;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
@@ -69,6 +64,11 @@ private:
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
+
+    ShaderPtr vertexShader;
+    ShaderPtr fragmentShader;
+
+    MeshPtr testoMesh;
 
     bool frameBufferResized;
 
@@ -103,6 +103,7 @@ public:
     void destroyVulkanInstance();
 
     void pickPhysicalDevice();
+    VkPhysicalDevice getPhysicalDevice();
     bool isDeviceSuitable(VkPhysicalDevice device);
     bool checkDevicePropertiesSupport(VkPhysicalDevice device);
     bool checkDeviceFeaturesSupport(VkPhysicalDevice device);
@@ -136,10 +137,6 @@ public:
     void createGraphicsPipeline();
     void destroyGraphicsPipeline();
 
-    VkShaderModule loadShader(const std::string &fileName);
-    VkShaderModule createShaderModule(const std::vector<char> &code);
-    void destroyShaderModule(const VkShaderModule &module);
-
     void createRenderPass();
     void destroyRenderPass();
 
@@ -151,4 +148,6 @@ public:
     void destroySyncObjects();
 
     void drawFrame();
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 };

@@ -1,5 +1,4 @@
 #include "Application.h"
-#include "core/Loader.h"
 
 int Application::run()
 {

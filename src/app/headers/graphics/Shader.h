@@ -1,18 +1,31 @@
 #pragma once
 
+#include "core/Core.h"
+
 #include <string>
 #include <vector>
 
-#include "core/Loader.h"
-#include "graphics/GraphicsProvider.h"
+#include "core/Vulkan.h"
 
-class Shader {
-    public:
-        std::string name;
-        std::string filePath;
-        VkShaderModule module;
-        GraphicsProvider* graphicsProviderPtr;
+class Shader
+{
+private:
+    std::string name;
+    std::string filePath;
+    VkShaderModule shaderModule;
+    GraphicsProviderPtr graphicsPtr;
 
-        void load(GraphicsProvider* graphicsProviderPtr, const std::string& fileName);
-        void destroy();
+public:
+    Shader()
+    {
+        this->name = "";
+        this->filePath = "";
+        this->shaderModule = nullptr;
+        this->graphicsPtr = nullptr;
+    };
+
+    void load(const GraphicsProviderPtr graphicsPtr, const std::string &fileName);
+    void destroy();
+
+    VkShaderModule getShaderModule();
 };
