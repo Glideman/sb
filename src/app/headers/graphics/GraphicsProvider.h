@@ -114,6 +114,9 @@ public:
     VkDevice getLogicalDevice();
     void destroyLogicalDevice();
 
+    VkQueue getGraphicsQueue();
+    VkQueue getPresentQueue();
+
     void createSurface();
     void destroySurface();
 
@@ -142,6 +145,7 @@ public:
 
     void createCommandBuffer();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    VkCommandPool getCommandPool();
     void destroyCommandBuffer();
 
     void createSyncObjects();

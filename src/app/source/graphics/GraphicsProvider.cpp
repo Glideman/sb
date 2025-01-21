@@ -372,6 +372,15 @@ void GraphicsProvider::destroyLogicalDevice()
     vkDestroyDevice(this->logicalDevice, nullptr);
 }
 
+VkQueue GraphicsProvider::getGraphicsQueue()
+{
+    return this->graphicsQueue;
+}
+VkQueue GraphicsProvider::getPresentQueue()
+{
+    return this->presentQueue;
+}
+
 void GraphicsProvider::createSurface()
 {
     VkResult result = glfwCreateWindowSurface(this->vulkanInstance, this->window, nullptr, &this->vulkanSurface);
@@ -943,6 +952,11 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
     {
         throw std::runtime_error("Failed to record command buffer!");
     }
+}
+
+VkCommandPool GraphicsProvider::getCommandPool()
+{
+    return this->commandPool;
 }
 
 void GraphicsProvider::destroyCommandBuffer()

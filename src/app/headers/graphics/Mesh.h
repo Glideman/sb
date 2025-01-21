@@ -10,6 +10,12 @@ private:
     VkDeviceMemory vertexBufferMemory;
     GraphicsProviderPtr graphicsPtr;
 
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+    void createVertexBuffer(const std::vector<Vertex> &vertices);
+    void fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemory);
+
 public:
     Mesh()
     {
