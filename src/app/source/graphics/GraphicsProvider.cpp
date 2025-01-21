@@ -944,7 +944,10 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdBindIndexBuffer(commandBuffer, this->testoMesh->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
+
+    // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(this->testoMesh->getIndexBufferSize()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 

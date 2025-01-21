@@ -10,21 +10,46 @@ void Mesh::create(const GraphicsProviderPtr graphicsPtr)
     this->graphicsPtr = graphicsPtr;
 
     const std::vector<Vertex> vertices = {
-        {{0.0f, -0.5f, 0.0f}, {1.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 1.0f}}};
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{0.7f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.7f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+        {{0.0f, 0.7f, 0.0f}, {1.0f, 0.0f, 1.0f}}};
+
+    const std::vector<uint16_t> indices = {
+        0, 1, 2, 0, 3, 1, 2, 1, 4};
+
+    this->vertexBufferSize = vertices.size();
+    this->indexBufferSize = indices.size();
 
     this->createVertexBuffer(vertices);
+    this->createIndexBuffer(indices);
 }
 
 void Mesh::destroy()
 {
+    this->destroyBuffer(this->indexBuffer, this->indexBufferMemory);
     this->destroyBuffer(this->vertexBuffer, this->vertexBufferMemory);
 }
 
 VkBuffer Mesh::getVertexBuffer()
 {
     return this->vertexBuffer;
+}
+
+VkBuffer Mesh::getIndexBuffer()
+{
+    return this->indexBuffer;
+}
+
+size_t Mesh::getVertexBufferSize()
+{
+    return this->vertexBufferSize;
+}
+
+size_t Mesh::getIndexBufferSize()
+{
+    return this->indexBufferSize;
 }
 
 void Mesh::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
@@ -40,8 +65,6 @@ void Mesh::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPro
     {
         throw std::runtime_error("Failed to create vertex buffer!");
     }
-
-    // binding
 
     VkMemoryRequirements memoryRequirements;
     vkGetBufferMemoryRequirements(this->graphicsPtr->getLogicalDevice(), buffer, &memoryRequirements);
@@ -64,8 +87,8 @@ void Mesh::createVertexBuffer(const std::vector<Vertex> &vertices)
 {
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer stagingBuffer = nullptr;
+    VkDeviceMemory stagingBufferMemory = nullptr;
 
     this->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
     this->fillBufferMemory(stagingBufferMemory, vertices.data(), bufferSize);
@@ -76,9 +99,25 @@ void Mesh::createVertexBuffer(const std::vector<Vertex> &vertices)
     this->destroyBuffer(stagingBuffer, stagingBufferMemory);
 }
 
+void Mesh::createIndexBuffer(const std::vector<uint16_t> &indices)
+{
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    VkBuffer stagingBuffer = nullptr;
+    VkDeviceMemory stagingBufferMemory = nullptr;
+
+    this->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    this->fillBufferMemory(stagingBufferMemory, indices.data(), bufferSize);
+
+    this->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, this->indexBuffer, this->indexBufferMemory);
+    this->copyBuffer(stagingBuffer, this->indexBuffer, bufferSize);
+
+    this->destroyBuffer(stagingBuffer, stagingBufferMemory);
+}
+
 void Mesh::fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize)
 {
-    void *data;
+    void *data = nullptr;
     vkMapMemory(this->graphicsPtr->getLogicalDevice(), bufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, bufferData, (size_t)bufferSize);
     vkUnmapMemory(this->graphicsPtr->getLogicalDevice(), bufferMemory);
