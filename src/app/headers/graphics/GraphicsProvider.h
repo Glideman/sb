@@ -12,11 +12,14 @@
 #include <limits>
 #include <algorithm>
 #include <vector>
+#include <chrono>
 
 #include "core/Vulkan.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#include "core/Math.h"
 
 typedef struct QueueFamilyIndices
 {
@@ -33,7 +36,14 @@ typedef struct SwapChainSupportDetails
     std::vector<VkPresentModeKHR> presentModes;
 } SwapChainSupportDetails;
 
-class GraphicsProvider
+typedef struct UniformBufferObject
+{
+    Matrix4x4 model;
+    Matrix4x4 view;
+    Matrix4x4 proj;
+} UniformBufferObject;
+
+class GraphicsProvider final
 {
 private:
     std::string preferedDeviceName;
@@ -41,6 +51,9 @@ private:
     std::vector<const char *> deviceExtensions;
 
     GLFWwindow *window;
+    uint16_t windowWidth;
+    uint16_t windowHeight;
+
     VkInstance vulkanInstance;
     VkPhysicalDevice physicalDevice;
     VkDevice logicalDevice;
@@ -56,6 +69,9 @@ private:
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkFramebuffer> swapChainFrameBuffers;
     VkRenderPass renderPass;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSet;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
     VkCommandPool commandPool;
@@ -68,13 +84,22 @@ private:
     ShaderPtr vertexShader;
     ShaderPtr fragmentShader;
 
-    MeshPtr testoMesh;
+    GridPtr testoGrid;
+
+    VkBuffer uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+    void *uniformBufferMapped;
 
     bool frameBufferResized;
+
+    int counter;
 
 public:
     GraphicsProvider()
     {
+        this->windowWidth = 0;
+        this->windowHeight = 0;
+
         // TODO move to config file
         this->preferedDeviceName = "NVIDIA GeForce RTX 4080";
         this->physicalDevice = VK_NULL_HANDLE;
@@ -83,6 +108,8 @@ public:
             VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
         this->frameBufferResized = false;
+
+        this->counter = 0;
     };
 
     static void error_callback(int error, const char *description);
@@ -151,7 +178,25 @@ public:
     void createSyncObjects();
     void destroySyncObjects();
 
+    void createDescriptorSetLayout();
+    void destroyDescriptorSetLayout();
+
+    void createUniformBuffer();
+    void updateUniformBuffer();
+    void destroyUniformBuffer();
+
+    void createDescriptorPool();
+    void destroyDescriptorPool();
+
+    void createDescriptorSet();
+    void destroyDescriptorSet();
+
     void drawFrame();
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+    void fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemory);
 };

@@ -38,10 +38,9 @@ float Vector2::dot(Vector2 vec)
     return this->x * vec.getX() + this->y * vec.getY();
 }
 
-Vector2 Vector2::dot(Vector2 a, Vector2 b)
+float Vector2::dot(Vector2 a, Vector2 b)
 {
-    a.dot(b);
-    return a;
+    return a.dot(b);
 }
 
 void Vector2::clear()
@@ -105,9 +104,11 @@ Vector3 Vector3::subtract(Vector3 a, Vector3 b)
 
 void Vector3::cross(Vector3 vec)
 {
-    this->x = this->y * vec.getZ() - this->z * vec.getY();
-    this->y = this->z * vec.getX() - this->x * vec.getZ();
-    this->z = this->x * vec.getY() - this->y * vec.getX();
+    float ox = this->x, oy = this->y, oz = this->z;
+
+    this->x = oy * vec.getZ() - oz * vec.getY();
+    this->y = oz * vec.getX() - ox * vec.getZ();
+    this->z = ox * vec.getY() - oy * vec.getX();
 }
 
 Vector3 Vector3::cross(Vector3 a, Vector3 b)
@@ -121,10 +122,9 @@ float Vector3::dot(Vector3 vec)
     return this->x * vec.getX() + this->y * vec.getY() + this->z * vec.getZ();
 }
 
-Vector3 Vector3::dot(Vector3 a, Vector3 b)
+float Vector3::dot(Vector3 a, Vector3 b)
 {
-    a.dot(b);
-    return a;
+    return a.dot(b);
 }
 
 void Vector3::clear()
@@ -204,10 +204,9 @@ float Vector4::dot(Vector4 vec)
     return this->x * vec.getX() + this->y * vec.getY() + this->z * vec.getZ() + this->w * vec.getW();
 }
 
-Vector4 Vector4::dot(Vector4 a, Vector4 b)
+float Vector4::dot(Vector4 a, Vector4 b)
 {
-    a.dot(b);
-    return a;
+    return a.dot(b);
 }
 
 uint32_t Vector4::toInt()
@@ -433,7 +432,7 @@ void Matrix4x4::lookAt(Vector3 eye, Vector3 at, Vector3 up)
     axisX.normalize();
 
     Vector3 axisY = Vector3::cross(axisZ, axisX);
-    // axisY.normalize();
+    axisY.normalize();
     //  TODO Normalize or not?... Hmmmm...
 
     // strange thing. in dx docs it's says +dot(axis, eye) but with that camera looks afterwards

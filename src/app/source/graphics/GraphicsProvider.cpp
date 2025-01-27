@@ -5,6 +5,7 @@
 #include "graphics/Shader.h"
 #include "graphics/Vertex.h"
 #include "graphics/Mesh.h"
+#include "primitives/Grid.h"
 
 bool QueueFamilyIndices::isComplete()
 {
@@ -38,24 +39,34 @@ void GraphicsProvider::init()
     this->createLogicalDevice();
     this->createSwapChainNecessities();
     this->createRenderPass();
+    this->createDescriptorSetLayout();
     this->createGraphicsPipeline();
     this->createCommandBuffer();
     this->createSyncObjects();
 
-    this->testoMesh = new Mesh();
-    this->testoMesh->create(this);
+    this->testoGrid = new Grid();
+    this->testoGrid->create(this);
+
+    this->createUniformBuffer();
+    this->createDescriptorPool();
+    this->createDescriptorSet();
 }
 
 void GraphicsProvider::cleanup()
 {
     this->waitUntilDeviceIdle();
 
-    this->testoMesh->destroy();
-    delete this->testoMesh;
+    this->destroyDescriptorSet();
+    this->destroyDescriptorPool();
+    this->destroyUniformBuffer();
+
+    this->testoGrid->destroy();
+    delete this->testoGrid;
 
     this->destroySyncObjects();
     this->destroyCommandBuffer();
     this->destroyGraphicsPipeline();
+    this->destroyDescriptorSetLayout();
     this->destroyRenderPass();
     this->destroySwapChainNecessities();
     this->destroyLogicalDevice();
@@ -82,7 +93,10 @@ void GraphicsProvider::createWindow()
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
     // TODO move to config file
-    this->window = glfwCreateWindow(800, 600, APPLICATION_NAME, nullptr, nullptr);
+    this->windowWidth = 800;
+    this->windowHeight = 600;
+
+    this->window = glfwCreateWindow(this->windowWidth, this->windowHeight, APPLICATION_NAME, nullptr, nullptr);
 
     if (!this->window)
     {
@@ -718,7 +732,7 @@ void GraphicsProvider::createGraphicsPipeline()
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_FILL | VK_POLYGON_MODE_LINE | VK_POLYGON_MODE_POINT
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_NONE VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
@@ -772,8 +786,10 @@ void GraphicsProvider::createGraphicsPipeline()
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.pNext = nullptr;
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = nullptr;
+    //    pipelineLayoutInfo.setLayoutCount = 0;
+    //    pipelineLayoutInfo.pSetLayouts = nullptr;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &this->descriptorSetLayout;
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -940,14 +956,18 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
     scissor.extent = this->swapChainExtent;
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    VkBuffer vertexBuffers[] = {this->testoMesh->getVertexBuffer()};
-    VkDeviceSize offsets[] = {0};
+    MeshPtr meshPointer = this->testoGrid->getMesh();
+
+    VkBuffer vertexBuffers[] = {meshPointer->getVertexBuffer()};
+    VkDeviceSize offsets[] = {meshPointer->getVertexBufferOffset()};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-    vkCmdBindIndexBuffer(commandBuffer, this->testoMesh->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, meshPointer->getIndexBuffer(), meshPointer->getIndexBufferOffset(), VK_INDEX_TYPE_UINT16);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this->pipelineLayout, 0, 1, &this->descriptorSet, 0, nullptr);
 
     // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(this->testoMesh->getIndexBufferSize()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshPointer->getIndexBufferSize()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -996,9 +1016,143 @@ void GraphicsProvider::destroySyncObjects()
     vkDestroySemaphore(this->logicalDevice, this->imageAvailableSemaphore, nullptr);
 }
 
+void GraphicsProvider::createDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.pNext = nullptr;
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(this->logicalDevice, &layoutInfo, nullptr, &this->descriptorSetLayout) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create descriptor set layout!");
+    }
+}
+
+void GraphicsProvider::destroyDescriptorSetLayout()
+{
+    vkDestroyDescriptorSetLayout(this->logicalDevice, this->descriptorSetLayout, nullptr);
+}
+
+void GraphicsProvider::createUniformBuffer()
+{
+    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+    this->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, this->uniformBuffer, this->uniformBufferMemory);
+    vkMapMemory(this->logicalDevice, this->uniformBufferMemory, 0, bufferSize, 0, &this->uniformBufferMapped);
+}
+
+void GraphicsProvider::updateUniformBuffer()
+{
+    //    static auto startTime = std::chrono::high_resolution_clock::now();
+    //
+    //    auto currentTime = std::chrono::high_resolution_clock::now();
+    //    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    UniformBufferObject ubo{};
+
+    Vector3 camerapos = Vector3(2.f + (float)this->counter * 0.01f, 2.f + (float)this->counter * 0.01f, 2.f + (float)this->counter * 0.01f);
+
+    // Vulkan defaults to a left-handed coordinate system with +Y down, +Z out of the screen (behind the default view) and +X to the right.
+
+    ubo.view.identity();
+    ubo.proj.identity();
+    ubo.view.lookAt(Vector3(2.f, 2.f, -2.f), Vector3(0.f, 0.f, 0.f), Vector3(0.f, 0.f, 1.f));
+    ubo.proj.perspective(3.14f / 3.f, (float)this->swapChainExtent.width / (float)this->swapChainExtent.height, 0.01f, 100.f);
+    // ubo.proj.ortho((float)this->swapChainExtent.width/100.f, (float)this->swapChainExtent.height/100.f, 0.1f, 10.f);
+
+    float rotation = 0.75f * (float)this->counter;
+
+    // LOG("counter is %i, rotation is %f\n", this->counter, rotation);
+
+    ubo.model.identity();
+    ubo.model.rotate(0.f, 0.f, rotation);
+
+    memcpy(this->uniformBufferMapped, &ubo, sizeof(UniformBufferObject));
+}
+
+void GraphicsProvider::destroyUniformBuffer()
+{
+    vkUnmapMemory(this->logicalDevice, this->uniformBufferMemory);
+    this->destroyBuffer(this->uniformBuffer, this->uniformBufferMemory);
+}
+
+void GraphicsProvider::createDescriptorPool()
+{
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.pNext = nullptr;
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+
+    if (vkCreateDescriptorPool(this->logicalDevice, &poolInfo, nullptr, &this->descriptorPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create descriptor pool!");
+    }
+}
+
+void GraphicsProvider::destroyDescriptorPool()
+{
+    vkDestroyDescriptorPool(this->logicalDevice, descriptorPool, nullptr);
+}
+
+void GraphicsProvider::createDescriptorSet()
+{
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = this->descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &this->descriptorSetLayout;
+
+    if (vkAllocateDescriptorSets(this->logicalDevice, &allocInfo, &this->descriptorSet) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate descriptor sets!");
+    }
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = this->uniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(UniformBufferObject);
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.pNext = nullptr;
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = this->descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr;
+    descriptorWrite.pTexelBufferView = nullptr;
+
+    vkUpdateDescriptorSets(this->logicalDevice, 1, &descriptorWrite, 0, nullptr);
+}
+
+void GraphicsProvider::destroyDescriptorSet()
+{
+    vkFreeDescriptorSets(this->logicalDevice, this->descriptorPool, 1, &this->descriptorSet);
+}
+
 void GraphicsProvider::drawFrame()
 {
     vkWaitForFences(this->logicalDevice, 1, &this->inFlightFence, VK_TRUE, UINT64_MAX);
+
+    this->counter++;
 
     uint32_t imageIndex = 0;
     VkResult result = vkAcquireNextImageKHR(this->logicalDevice, this->swapChain, UINT64_MAX, this->imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
@@ -1019,6 +1173,8 @@ void GraphicsProvider::drawFrame()
 
     vkResetCommandBuffer(this->commandBuffer, 0);
     this->recordCommandBuffer(this->commandBuffer, imageIndex);
+
+    this->updateUniformBuffer();
 
     VkSubmitInfo submitInfo{};
     submitInfo.pNext = nullptr;
@@ -1070,4 +1226,86 @@ uint32_t GraphicsProvider::findMemoryType(uint32_t typeFilter, VkMemoryPropertyF
     }
 
     throw std::runtime_error("Failed to find suitable memory type!");
+}
+
+void GraphicsProvider::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
+{
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.pNext = nullptr;
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+
+    if (vkCreateBuffer(this->logicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create vertex buffer!");
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(this->logicalDevice, buffer, &memoryRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memoryRequirements.size;
+    allocInfo.memoryTypeIndex = this->findMemoryType(memoryRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(this->logicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate vertex buffer memory!");
+    }
+
+    vkBindBufferMemory(this->logicalDevice, buffer, bufferMemory, 0);
+}
+
+void GraphicsProvider::fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize)
+{
+    void *data = nullptr;
+    vkMapMemory(this->logicalDevice, bufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, bufferData, (size_t)bufferSize);
+    vkUnmapMemory(this->logicalDevice, bufferMemory);
+}
+
+void GraphicsProvider::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+{
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = this->commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(this->logicalDevice, &allocInfo, &commandBuffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.pNext = nullptr;
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    vkQueueSubmit(this->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(this->graphicsQueue); // vkWaitForFences
+    vkFreeCommandBuffers(this->logicalDevice, this->commandPool, 1, &commandBuffer);
+}
+
+void GraphicsProvider::destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemory)
+{
+    vkDestroyBuffer(this->logicalDevice, buffer, nullptr);
+    vkFreeMemory(this->logicalDevice, bufferMemory, nullptr);
 }

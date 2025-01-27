@@ -24,7 +24,7 @@ public:
     void subtract(Vector2 vec);
     static Vector2 subtract(Vector2 a, Vector2 b);
     float dot(Vector2 vec);
-    static Vector2 dot(Vector2 a, Vector2 b);
+    static float dot(Vector2 a, Vector2 b);
     void clear();
     float getX();
     float getY();
@@ -51,7 +51,7 @@ public:
     void cross(Vector3 vec);
     static Vector3 cross(Vector3 a, Vector3 b);
     float dot(Vector3 vec);
-    static Vector3 dot(Vector3 a, Vector3 b);
+    static float dot(Vector3 a, Vector3 b);
     void clear();
     float getX();
     float getY();
@@ -78,7 +78,7 @@ public:
     void subtract(Vector4 vec);
     static Vector4 subtract(Vector4 a, Vector4 b);
     float dot(Vector4 vec);
-    static Vector4 dot(Vector4 a, Vector4 b);
+    static float dot(Vector4 a, Vector4 b);
     uint32_t toInt();
     void fromInt(uint32_t i);
     void clear();

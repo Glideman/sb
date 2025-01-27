@@ -16,13 +16,11 @@ private:
 
     size_t vertexBufferSize;
     size_t indexBufferSize;
+    size_t vertexBufferOffset;
+    size_t indexBufferOffset;
 
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     void createVertexBuffer(const std::vector<Vertex> &vertices);
     void createIndexBuffer(const std::vector<uint16_t> &indices);
-    void fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    void destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemory);
 
 public:
     Mesh()
@@ -34,12 +32,16 @@ public:
         this->graphicsPtr = nullptr;
         this->vertexBufferSize = 0;
         this->indexBufferSize = 0;
+        this->vertexBufferOffset = 0;
+        this->indexBufferOffset = 0;
     };
 
-    void create(const GraphicsProviderPtr graphicsPtr);
+    void create(const GraphicsProviderPtr graphicsPtr, const std::vector<Vertex> &vertices, const std::vector<uint16_t> &indices);
     void destroy();
     VkBuffer getVertexBuffer();
     VkBuffer getIndexBuffer();
     size_t getVertexBufferSize();
     size_t getIndexBufferSize();
+    size_t getVertexBufferOffset();
+    size_t getIndexBufferOffset();
 };
