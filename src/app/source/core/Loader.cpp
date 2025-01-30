@@ -2,26 +2,43 @@
 
 void Loader::init(const std::string &dataPath)
 {
-    this->dataPath = dataPath;
+    this->dataFolders.push_back(dataPath);
+}
+
+void Loader::init(const std::vector<std::string> &dataFolders)
+{
+    for (int i = 0; i < dataFolders.size(); i++)
+    {
+        this->dataFolders.push_back(dataFolders[i]);
+    }
 }
 
 std::vector<char> Loader::readFile(const std::string &fileName)
 {
-    auto filePath = std::format("{}\\{}", this->dataPath, fileName);
+    std::vector<char> buffer{};
 
-    std::ifstream file(filePath, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open())
+    for (int i = 0; i < this->dataFolders.size(); i++)
     {
-        throw std::runtime_error(std::format("Failed to open file {}", filePath));
+        auto filePath = std::format("{}\\{}", this->dataFolders[i], fileName);
+        this->tryToReadFile(filePath, buffer);
+        if (!buffer.empty())
+            break;
     }
 
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-
     return buffer;
+}
+
+void Loader::tryToReadFile(const std::string &filePath, std::vector<char> &buffer)
+{
+    std::ifstream file(filePath, std::ios::ate | std::ios::binary);
+
+    if (file.is_open())
+    {
+        size_t fileSize = (size_t)file.tellg();
+        buffer.resize(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+        file.close();
+    }
 }

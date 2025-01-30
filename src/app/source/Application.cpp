@@ -22,7 +22,8 @@ void Application::stop()
 void Application::init()
 {
 	// TODO Вынести в конфиг
-	Loader::getInstance().init("data");
+	std::vector<std::string> dataFolders{"data", "..\\data"};
+	Loader::getInstance().init(dataFolders);
 	this->graphicsProvider->init();
 }
 

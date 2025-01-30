@@ -12,10 +12,12 @@ class Loader
 private:
     Loader()
     {
-        this->dataPath = "";
+        this->dataFolders.resize(0);
     }
 
-    std::string dataPath;
+    std::vector<std::string> dataFolders;
+
+    void tryToReadFile(const std::string &filePath, std::vector<char> &buffer);
 
 public:
     Loader(Loader const &) = delete;
@@ -28,5 +30,6 @@ public:
     }
 
     void init(const std::string &dataPath);
+    void init(const std::vector<std::string> &dataFolders);
     std::vector<char> readFile(const std::string &fileName);
 };
