@@ -1,3 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
+
 #include "graphics/GraphicsProvider.h"
 #include "core/Loader.h"
 #include "core/Logger.h"
@@ -47,6 +49,8 @@ void GraphicsProvider::init()
     this->testoGrid = new Grid();
     this->testoGrid->create(this);
 
+    this->createTextureImage();
+
     this->createUniformBuffer();
     this->createDescriptorPool();
     this->createDescriptorSet();
@@ -59,6 +63,11 @@ void GraphicsProvider::cleanup()
     this->destroyDescriptorSet();
     this->destroyDescriptorPool();
     this->destroyUniformBuffer();
+
+    this->destroyTextureImage();
+
+    // this->testoCube->destroy();
+    // delete this->testoCube;
 
     this->testoGrid->destroy();
     delete this->testoGrid;
@@ -732,7 +741,7 @@ void GraphicsProvider::createGraphicsPipeline()
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_FILL | VK_POLYGON_MODE_LINE | VK_POLYGON_MODE_POINT
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_NONE VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_NONE VK_CULL_MODE_FRONT_BIT VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
@@ -968,6 +977,19 @@ void GraphicsProvider::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32
 
     // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshPointer->getIndexBufferSize()), 1, 0, 0, 0);
+
+    //    MeshPtr meshPointer2 = this->testoCube->getMesh();
+    //
+    //    VkBuffer vertexBuffers[] = {meshPointer2->getVertexBuffer()};
+    //    VkDeviceSize offsets[] = {meshPointer2->getVertexBufferOffset()};
+    //    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    //
+    //    vkCmdBindIndexBuffer(commandBuffer, meshPointer2->getIndexBuffer(), meshPointer2->getIndexBufferOffset(), VK_INDEX_TYPE_UINT16);
+    //
+    //    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this->pipelineLayout, 0, 1, &this->descriptorSet, 0, nullptr);
+    //
+    //    // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    //    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshPointer2->getIndexBufferSize()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1269,6 +1291,19 @@ void GraphicsProvider::fillBufferMemory(VkDeviceMemory bufferMemory, const void 
 
 void GraphicsProvider::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
+    commandBuffer = this->beginSingleCommandBuffer();
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    this->endSingleCommandBuffer(commandBuffer);
+}
+
+VkCommandBuffer GraphicsProvider::beginSingleCommandBuffer()
+{
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.pNext = nullptr;
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1286,12 +1321,11 @@ void GraphicsProvider::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevi
 
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
-    VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+    return commandBuffer;
+}
 
+void GraphicsProvider::endSingleCommandBuffer(VkCommandBuffer commandBuffer)
+{
     vkEndCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo{};
@@ -1308,4 +1342,176 @@ void GraphicsProvider::destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemor
 {
     vkDestroyBuffer(this->logicalDevice, buffer, nullptr);
     vkFreeMemory(this->logicalDevice, bufferMemory, nullptr);
+}
+
+void GraphicsProvider::createTextureImage()
+{
+    // loadup image data
+
+    int texWidth, texHeight, texChannels;
+    stbi_uc *pixels = stbi_load("data\\textures\\2025-02-14 152530.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+    if (!pixels)
+    {
+        throw std::runtime_error("Failed to load texture image!");
+    }
+
+    std::cout << "\nImage:\n";
+    std::cout << "W:" << texWidth << "\n";
+    std::cout << "H:" << texHeight << "\n";
+    std::cout << "Size:" << imageSize << "\n";
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    this->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    this->fillBufferMemory(stagingBufferMemory, pixels, imageSize);
+
+    stbi_image_free(pixels);
+
+    // creatin image
+
+    VkImageCreateInfo imageInfo{};
+    imageInfo.pNext = nullptr;
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = static_cast<uint32_t>(texWidth);
+    imageInfo.extent.height = static_cast<uint32_t>(texHeight);
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.flags = 0; // Optional
+
+    if (vkCreateImage(this->logicalDevice, &imageInfo, nullptr, &this->textureImage) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create image!");
+    }
+
+    // binding memory
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(this->logicalDevice, this->textureImage, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.pNext = nullptr;
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    if (vkAllocateMemory(this->logicalDevice, &allocInfo, nullptr, &this->textureImageMemory) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate image memory!");
+    }
+
+    vkBindImageMemory(this->logicalDevice, this->textureImage, this->textureImageMemory, 0);
+
+    // buffers stuff
+
+    this->transitionImageLayout(this->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    this->copyBufferToImage(stagingBuffer, this->textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    this->transitionImageLayout(this->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    // cleanup
+
+    vkDestroyBuffer(this->logicalDevice, stagingBuffer, nullptr);
+    vkFreeMemory(this->logicalDevice, stagingBufferMemory, nullptr);
+}
+
+void GraphicsProvider::destroyTextureImage()
+{
+    vkDestroyImage(this->logicalDevice, this->textureImage, nullptr);
+    vkFreeMemory(this->logicalDevice, this->textureImageMemory, nullptr);
+}
+
+void GraphicsProvider::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+{
+    commandBuffer = this->beginSingleCommandBuffer();
+
+    VkImageMemoryBarrier barrier{};
+    barrier.pNext = nullptr;
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = 0;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else
+    {
+        throw std::invalid_argument("Unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage, destinationStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier);
+
+    this->endSingleCommandBuffer(commandBuffer);
+}
+
+void GraphicsProvider::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+{
+    commandBuffer = this->beginSingleCommandBuffer();
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {
+        width,
+        height,
+        1};
+
+    vkCmdCopyBufferToImage(
+        commandBuffer,
+        buffer,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &region);
+
+    this->endSingleCommandBuffer(commandBuffer);
 }

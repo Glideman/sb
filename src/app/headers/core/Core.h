@@ -15,3 +15,5 @@ typedef struct Vertex *VertexPtr;
 typedef class CommonPrimitive *CommonPrimitivePtr;
 typedef class Grid *GridPtr;
 typedef class Plane *PlanePtr;
+typedef class Cube *CubePtr;
+typedef class Sphere *SpherePtr;

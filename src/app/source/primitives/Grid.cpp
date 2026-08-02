@@ -41,11 +41,7 @@ std::vector<uint16_t> Grid::getIndexBufferData()
 {
     std::vector<uint16_t> indices;
 
-    float width = 5.f, height = 5.f;
     uint8_t xSections = 10, ySections = 10;
-
-    float xStart = 0 - (width / 2);
-    float yStart = 0 - (height / 2);
 
     for (int y = 0; y < ySections; y++)
     {

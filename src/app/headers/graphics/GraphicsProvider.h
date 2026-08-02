@@ -21,6 +21,8 @@
 
 #include "core/Math.h"
 
+#include <stb_image.h>
+
 typedef struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
@@ -85,6 +87,9 @@ private:
     ShaderPtr fragmentShader;
 
     GridPtr testoGrid;
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
 
     VkBuffer uniformBuffer;
     VkDeviceMemory uniformBufferMemory;
@@ -198,5 +203,12 @@ public:
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     void fillBufferMemory(VkDeviceMemory bufferMemory, const void *bufferData, VkDeviceSize bufferSize);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    VkCommandBuffer beginSingleCommandBuffer();
+    void endSingleCommandBuffer(VkCommandBuffer commandBuffer);
     void destroyBuffer(VkBuffer buffer, VkDeviceMemory bufferMemory);
+
+    void createTextureImage();
+    void destroyTextureImage();
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 };
