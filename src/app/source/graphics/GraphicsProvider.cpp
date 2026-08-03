@@ -51,6 +51,7 @@ void GraphicsProvider::init()
 
     this->createTextureImage();
     this->createTextureImageView();
+    this->createTextureSampler();
 
     this->createUniformBuffer();
     this->createDescriptorPool();
@@ -65,6 +66,7 @@ void GraphicsProvider::cleanup()
     this->destroyDescriptorPool();
     this->destroyUniformBuffer();
 
+    this->destroyTextureSampler();
     this->destroyTextureImageView();
     this->destroyTextureImage();
 
@@ -269,7 +271,8 @@ bool GraphicsProvider::isDeviceSuitable(VkPhysicalDevice device)
     return indices.isComplete() &&
            this->checkDevicePropertiesSupport(device) &&
            this->checkDeviceFeaturesSupport(device) &&
-           extensionSupported && swapChainAdequate;
+           extensionSupported &&
+           swapChainAdequate;
 }
 
 bool GraphicsProvider::checkDevicePropertiesSupport(VkPhysicalDevice device)
@@ -285,7 +288,7 @@ bool GraphicsProvider::checkDeviceFeaturesSupport(VkPhysicalDevice device)
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-    return deviceFeatures.geometryShader;
+    return deviceFeatures.geometryShader && deviceFeatures.samplerAnisotropy;
 }
 
 bool GraphicsProvider::checkDeviceExtensionSupport(VkPhysicalDevice device)
@@ -1533,4 +1536,37 @@ void GraphicsProvider::createTextureImageView()
 void GraphicsProvider::destroyTextureImageView()
 {
     vkDestroyImageView(this->logicalDevice, this->textureImageView, nullptr);
+}
+
+void GraphicsProvider::createTextureSampler()
+{
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(this->physicalDevice, &properties);
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.pNext = nullptr;
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(this->logicalDevice, &samplerInfo, nullptr, &this->textureSampler) != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create texture sampler!");
+    }
+}
+
+void GraphicsProvider::destroyTextureSampler()
+{
+    vkDestroySampler(this->logicalDevice, this->textureSampler, nullptr);
 }

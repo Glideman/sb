@@ -91,6 +91,7 @@ private:
     VkImage textureImage;
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
+    VkSampler textureSampler;
 
     VkBuffer uniformBuffer;
     VkDeviceMemory uniformBufferMemory;
@@ -213,6 +214,10 @@ public:
     void destroyTextureImage();
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
     void createTextureImageView();
     void destroyTextureImageView();
+
+    void createTextureSampler();
+    void destroyTextureSampler();
 };
