@@ -8,7 +8,8 @@ struct Vertex
 {
     Vector3 pos;
     Vector3 color;
+    Vector2 tex;
 
     static VkVertexInputBindingDescription getBindingDescription();
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
+    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
 };

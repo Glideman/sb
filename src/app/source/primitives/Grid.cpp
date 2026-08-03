@@ -22,10 +22,10 @@ std::vector<Vertex> Grid::getVertexBufferData()
             float x1 = xStart + width / xSections * (x + 1);
             float y1 = yStart + height / ySections * (y + 1);
 
-            Vertex vert1 = {{x0, y0, 0.f}, {colorGradient, colorGradient, colorGradient}};
-            Vertex vert2 = {{x1, y1, 0.f}, {colorGradient, colorGradient, colorGradient}};
-            Vertex vert3 = {{x0, y1, 0.f}, {colorGradient, colorGradient, colorGradient}};
-            Vertex vert4 = {{x1, y0, 0.f}, {colorGradient, colorGradient, colorGradient}};
+            Vertex vert1 = {{x0, y0, 0.f}, {colorGradient, colorGradient, colorGradient}, {0.f, 0.f}};
+            Vertex vert2 = {{x1, y1, 0.f}, {colorGradient, colorGradient, colorGradient}, {1.f, 1.f}};
+            Vertex vert3 = {{x0, y1, 0.f}, {colorGradient, colorGradient, colorGradient}, {0.f, 1.f}};
+            Vertex vert4 = {{x1, y0, 0.f}, {colorGradient, colorGradient, colorGradient}, {1.f, 0.f}};
 
             vertices.push_back(vert1);
             vertices.push_back(vert2);
